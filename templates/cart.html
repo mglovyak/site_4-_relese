@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Корзина{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Корзина</h1>
+    
+    {% if cart_items %}
+        <div class="row">
+            <div class="col-md-8">
+                {% for item in cart_items %}
+                    <div class="card mb-3">
+                        <div class="row g-0">
+                            <div class="col-md-4">
+                                <img src="{{ url_for('static', filename=item.furniture.image) }}" 
+                                     class="img-fluid rounded-start img-fallback" alt="{{ item.furniture.name }}">
+                            </div>
+                            <div class="col-md-8">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ item.furniture.name }}</h5>
+                                    <p class="card-text">{{ item.furniture.description }}</p>
+                                    <p class="card-text">
+                                        <small class="text-muted">Количество: {{ item.quantity }}</small>
+                                    </p>
+                                    <p class="card-text">
+                                        <strong>Цена: {{ item.furniture.price * item.quantity }} ₽</strong>
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <form action="{{ url_for('add_to_cart', furniture_id=item.furniture.id) }}" method="POST">
+                                            <button type="submit" class="btn btn-primary">Добавить еще</button>
+                                        </form>
+                                        <form action="{{ url_for('remove_from_cart', item_id=item.id) }}" method="POST">
+                                            <button type="submit" class="btn btn-danger">Удалить</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Итого</h5>
+                        <p class="card-text">Общая сумма: {{ total }} ₽</p>
+                        <a href="{{ url_for('checkout') }}" class="btn btn-success w-100">Оформить заказ</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            Ваша корзина пуста. <a href="{{ url_for('home') }}">Вернуться к покупкам</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 

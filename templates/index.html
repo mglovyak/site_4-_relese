@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Главная{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Добро пожаловать в наш магазин мебели</h1>
+
+<div class="row">
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            <img src="{{ url_for('static', filename='images/living-room.jpg') }}" class="card-img-top" alt="Гостиная">
+            <div class="card-body">
+                <h5 class="card-title">Гостиная</h5>
+                <p class="card-text">Мебель для вашей гостиной: диваны, кресла, журнальные столики.</p>
+                <a href="{{ url_for('category', category='living-room') }}" class="btn btn-primary">Перейти</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            <img src="{{ url_for('static', filename='images/bedroom.jpg') }}" class="card-img-top" alt="Спальня">
+            <div class="card-body">
+                <h5 class="card-title">Спальня</h5>
+                <p class="card-text">Кровати, шкафы, комоды и тумбочки для спальни.</p>
+                <a href="{{ url_for('category', category='bedroom') }}" class="btn btn-primary">Перейти</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            <img src="{{ url_for('static', filename='images/kitchen.jpg') }}" class="card-img-top" alt="Кухня">
+            <div class="card-body">
+                <h5 class="card-title">Кухня</h5>
+                <p class="card-text">Кухонные гарнитуры, столы, стулья и шкафы.</p>
+                <a href="{{ url_for('category', category='kitchen') }}" class="btn btn-primary">Перейти</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            <img src="{{ url_for('static', filename='images/office.jpg') }}" class="card-img-top" alt="Офис">
+            <div class="card-body">
+                <h5 class="card-title">Офис</h5>
+                <p class="card-text">Офисная мебель: столы, кресла, шкафы для документов.</p>
+                <a href="{{ url_for('category', category='office') }}" class="btn btn-primary">Перейти</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12">
+        <h2>Новые поступления</h2>
+    </div>
+    {% for item in furniture[:4] %}
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            {% if item.image %}
+            <img src="{{ url_for('static', filename=item.image) }}" class="card-img-top" alt="{{ item.name }}">
+            {% else %}
+            <img src="{{ url_for('static', filename='images/no-image.jpg') }}" class="card-img-top" alt="Нет изображения">
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title">{{ item.name }}</h5>
+                <p class="card-text">{{ item.description[:100] }}...</p>
+                <p class="card-text"><strong>Цена: {{ item.price }} ₽</strong></p>
+                <a href="{{ url_for('product', id=item.id) }}" class="btn btn-primary">Подробнее</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %} 

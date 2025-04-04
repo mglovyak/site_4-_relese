@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}{{ furniture.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        {% if furniture.image %}
+        <img src="{{ url_for('static', filename=furniture.image) }}" class="img-fluid rounded" alt="{{ furniture.name }}">
+        {% else %}
+        <img src="{{ url_for('static', filename='images/no-image.jpg') }}" class="img-fluid rounded" alt="Нет изображения">
+        {% endif %}
+    </div>
+    <div class="col-md-6">
+        <h1 class="mb-4">{{ furniture.name }}</h1>
+        <p class="lead">{{ furniture.description }}</p>
+        <p class="h3 text-primary mb-4">Цена: {{ furniture.price }} ₽</p>
+        <p><strong>Категория:</strong> {{ furniture.category|title }}</p>
+        
+        <div class="mt-4">
+            <button class="btn btn-primary btn-lg">Добавить в корзину</button>
+            <button class="btn btn-outline-primary btn-lg ms-2">Купить сейчас</button>
+        </div>
+        
+        <div class="mt-4">
+            <h4>Характеристики:</h4>
+            <ul class="list-unstyled">
+                <li><strong>Артикул:</strong> {{ furniture.id }}</li>
+                <li><strong>Дата добавления:</strong> {{ furniture.created_at.strftime('%d.%m.%Y') }}</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12">
+        <h3>Похожие товары</h3>
+    </div>
+    <!-- Здесь можно добавить карточки похожих товаров -->
+</div>
+{% endblock %} 

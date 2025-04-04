@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Поиск товаров{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Поиск товаров</h1>
+    
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <form action="{{ url_for('search') }}" method="GET" class="d-flex gap-2">
+                <input type="text" name="query" class="form-control" 
+                       placeholder="Поиск по названию или описанию..." value="{{ query }}">
+                <select name="category" class="form-select" style="width: auto;">
+                    <option value="">Все категории</option>
+                    <option value="living-room" {% if selected_category == 'living-room' %}selected{% endif %}>
+                        Гостиная
+                    </option>
+                    <option value="bedroom" {% if selected_category == 'bedroom' %}selected{% endif %}>
+                        Спальня
+                    </option>
+                    <option value="kitchen" {% if selected_category == 'kitchen' %}selected{% endif %}>
+                        Кухня
+                    </option>
+                </select>
+                <button type="submit" class="btn btn-primary">Поиск</button>
+            </form>
+        </div>
+    </div>
+
+    {% if query or selected_category %}
+        <div class="mb-3">
+            <h5>Результаты поиска:</h5>
+            {% if query %}
+                <span class="badge bg-secondary">Запрос: {{ query }}</span>
+            {% endif %}
+            {% if selected_category %}
+                <span class="badge bg-secondary">
+                    Категория: 
+                    {% if selected_category == 'living-room' %}
+                        Гостиная
+                    {% elif selected_category == 'bedroom' %}
+                        Спальня
+                    {% elif selected_category == 'kitchen' %}
+                        Кухня
+                    {% endif %}
+                </span>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if furniture %}
+        <div class="row">
+            {% for item in furniture %}
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <img src="{{ url_for('static', filename=item.image) }}" 
+                             class="card-img-top img-fallback" alt="{{ item.name }}">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ item.name }}</h5>
+                            <p class="card-text">{{ item.description }}</p>
+                            <p class="card-text">
+                                <strong>Цена: {{ item.price }} ₽</strong>
+                            </p>
+                            <p class="card-text">
+                                <small class="text-muted">В наличии: {{ item.stock }} шт.</small>
+                            </p>
+                            <form action="{{ url_for('add_to_cart', furniture_id=item.id) }}" method="POST">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    Добавить в корзину
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            По вашему запросу ничего не найдено.
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 

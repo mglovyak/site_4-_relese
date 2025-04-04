@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование товара{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Редактирование товара</h1>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Название</label>
+                            <input type="text" class="form-control" id="name" name="name" 
+                                   value="{{ furniture.name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Описание</label>
+                            <textarea class="form-control" id="description" name="description" 
+                                    rows="3" required>{{ furniture.description }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="price" class="form-label">Цена</label>
+                            <input type="number" class="form-control" id="price" name="price" 
+                                   step="0.01" value="{{ furniture.price }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="category" class="form-label">Категория</label>
+                            <select class="form-select" id="category" name="category" required>
+                                <option value="living-room" {% if furniture.category == 'living-room' %}selected{% endif %}>
+                                    Гостиная
+                                </option>
+                                <option value="bedroom" {% if furniture.category == 'bedroom' %}selected{% endif %}>
+                                    Спальня
+                                </option>
+                                <option value="kitchen" {% if furniture.category == 'kitchen' %}selected{% endif %}>
+                                    Кухня
+                                </option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="stock" class="form-label">Количество на складе</label>
+                            <input type="number" class="form-control" id="stock" name="stock" 
+                                   value="{{ furniture.stock }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="image" class="form-label">Изображение</label>
+                            {% if furniture.image %}
+                                <div class="mb-2">
+                                    <img src="{{ url_for('static', filename=furniture.image) }}" 
+                                         alt="{{ furniture.name }}" class="img-thumbnail" style="max-height: 200px;">
+                                </div>
+                            {% endif %}
+                            <input type="file" class="form-control" id="image" name="image" accept="image/*">
+                            <small class="form-text text-muted">
+                                Оставьте пустым, если не хотите менять изображение
+                            </small>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin') }}" class="btn btn-secondary">Назад</a>
+                            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
