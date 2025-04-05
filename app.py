@@ -112,17 +112,21 @@ def add_initial_furniture():
 
 # Создаем администратора
 def create_admin():
-    admin = User.query.filter_by(username='admin').first()
-    if not admin:
-        admin = User(
-            username='admin',
-            email='admin@example.com',
-            is_admin=True
-        )
-        admin.set_password('admin123')
-        db.session.add(admin)
-        db.session.commit()
-        print('Администратор создан: admin/admin123')
+    try:
+        admin = User.query.filter_by(username='admin').first()
+        if not admin:
+            admin = User(
+                username='admin',
+                email='admin@example.com',
+                is_admin=True
+            )
+            admin.set_password('admin123')
+            db.session.add(admin)
+            db.session.commit()
+            print('Администратор создан: admin/admin123')
+    except Exception as e:
+        print(f'Ошибка при создании администратора: {str(e)}')
+        db.session.rollback()
 
 # Декоратор для проверки прав администратора
 def admin_required(f):
@@ -560,6 +564,35 @@ def initialize_on_first_request():
             except Exception as e:
                 print(f"Ошибка при инициализации базы данных: {str(e)}")
         _is_initialized = True
+
+# Инициализация базы данных и создание администратора
+def init_db():
+    with app.app_context():
+        db.create_all()
+        create_admin()
+        add_initial_furniture()
+
+# Вызываем инициализацию при запуске
+init_db()
+
+@app.route('/admin')
+@admin_required
+def admin_panel():
+    products = Furniture.query.all()
+    orders = Order.query.all()
+    return render_template('admin/dashboard.html', products=products, orders=orders)
+
+@app.route('/admin/products')
+@admin_required
+def admin_products():
+    products = Furniture.query.all()
+    return render_template('admin/products.html', products=products)
+
+@app.route('/admin/orders')
+@admin_required
+def admin_orders():
+    orders = Order.query.all()
+    return render_template('admin/orders.html', orders=orders)
 
 if __name__ == '__main__':
     # Локальная разработка

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Панель администратора</h1>
+    
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Товары</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Всего товаров: {{ products|length }}</h6>
+                    <a href="{{ url_for('admin_products') }}" class="btn btn-primary">Управление товарами</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Заказы</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Всего заказов: {{ orders|length }}</h6>
+                    <a href="{{ url_for('admin_orders') }}" class="btn btn-primary">Управление заказами</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
