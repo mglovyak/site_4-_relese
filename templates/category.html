@@ -11,45 +11,33 @@
 {% endblock %}
 
 {% block content %}
-<div class="container">
-    <h1 class="mb-4">
-        {% if category == 'living-room' %}
-            Мебель для гостиной
-        {% elif category == 'bedroom' %}
-            Мебель для спальни
-        {% elif category == 'kitchen' %}
-            Мебель для кухни
-        {% endif %}
-    </h1>
+<h1>{{ category.name }}</h1>
+<p class="lead">{{ category.description }}</p>
 
-    {% if furniture %}
-        <div class="row">
-            {% for item in furniture %}
-                <div class="col-md-4 mb-4">
-                    <div class="card h-100">
-                        <img src="{{ url_for('static', filename=item.image) }}" 
-                             class="card-img-top img-fallback" alt="{{ item.name }}">
-                        <div class="card-body">
-                            <h5 class="card-title">{{ item.name }}</h5>
-                            <p class="card-text">{{ item.description }}</p>
-                            <p class="card-text">
-                                <strong>Цена: {{ item.price }} ₽</strong>
-                            </p>
-                            <p class="card-text">
-                                <small class="text-muted">В наличии: {{ item.stock }} шт.</small>
-                            </p>
-                            <form action="{{ url_for('add_to_cart', furniture_id=item.id) }}" method="POST">
-                                <button type="submit" class="btn btn-primary w-100">Добавить в корзину</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
+<div class="row">
+    {% for item in furniture %}
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <img src="{{ url_for('static', filename=item.image) }}" class="card-img-top img-fallback" alt="{{ item.name }}">
+            <div class="card-body">
+                <h5 class="card-title">{{ item.name }}</h5>
+                <p class="card-text">{{ item.description }}</p>
+                <p class="card-text"><strong>Цена: {{ item.price }} ₽</strong></p>
+                <p class="card-text">В наличии: {{ item.stock }}</p>
+                {% if item.stock > 0 %}
+                <form action="{{ url_for('add_to_cart', furniture_id=item.id) }}" method="POST">
+                    <button type="submit" class="btn btn-primary">Добавить в корзину</button>
+                </form>
+                {% else %}
+                <button class="btn btn-secondary" disabled>Нет в наличии</button>
+                {% endif %}
+            </div>
         </div>
+    </div>
     {% else %}
-        <div class="alert alert-info">
-            В данной категории пока нет товаров.
-        </div>
-    {% endif %}
+    <div class="col-12">
+        <p>В этой категории пока нет товаров.</p>
+    </div>
+    {% endfor %}
 </div>
 {% endblock %} 

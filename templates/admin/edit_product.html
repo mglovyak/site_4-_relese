@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование товара{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Редактирование товара</h1>
+    
+    <form method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="name">Название товара</label>
+            <input type="text" class="form-control" id="name" name="name" value="{{ furniture.name }}" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Описание</label>
+            <textarea class="form-control" id="description" name="description" rows="3" required>{{ furniture.description }}</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="price">Цена</label>
+            <input type="number" class="form-control" id="price" name="price" value="{{ furniture.price }}" step="0.01" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="category">Категория</label>
+            <select class="form-control" id="category" name="category_id" required>
+                {% for category in get_categories() %}
+                <option value="{{ category.id }}" {% if category.id == furniture.category_id %}selected{% endif %}>
+                    {{ category.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="stock">Количество на складе</label>
+            <input type="number" class="form-control" id="stock" name="stock" value="{{ furniture.stock }}" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="image">Изображение</label>
+            <input type="file" class="form-control-file" id="image" name="image">
+            {% if furniture.image %}
+            <div class="mt-2">
+                <p>Текущее изображение:</p>
+                <img src="{{ url_for('static', filename=furniture.image) }}" alt="{{ furniture.name }}" style="max-width: 200px;">
+            </div>
+            {% endif %}
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+        <a href="{{ url_for('admin_products') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %} 

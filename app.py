@@ -5,6 +5,9 @@ import os
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from PIL import Image, ImageDraw
+from werkzeug.utils import secure_filename
+from mail_config import init_mail, send_notification
+import time
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
@@ -18,15 +21,27 @@ if database_url.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
 db = SQLAlchemy(app)
+
+mail = init_mail(app)
 
 @app.template_filter('cart_count')
 def cart_count(user_id):
     return CartItem.query.filter_by(user_id=user_id).with_entities(db.func.sum(CartItem.quantity)).scalar() or 0
 
-@app.template_filter('get_user')
-def get_user(user_id):
-    return User.query.get(user_id)
+@app.context_processor
+def utility_processor():
+    def get_categories():
+        return Category.query.order_by(Category.name).all()
+    def get_user(user_id):
+        return User.query.get(user_id)
+    return dict(get_categories=get_categories, get_user=get_user)
 
 # Модели
 class User(db.Model):
@@ -42,12 +57,19 @@ class User(db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    slug = db.Column(db.String(50), unique=True, nullable=False)
+    description = db.Column(db.Text)
+    furniture = db.relationship('Furniture', backref='category_rel', lazy=True)
+
 class Furniture(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=False)
     price = db.Column(db.Float, nullable=False)
-    category = db.Column(db.String(50), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     image = db.Column(db.String(100), nullable=False)
     stock = db.Column(db.Integer, default=0)
 
@@ -78,55 +100,135 @@ class OrderItem(db.Model):
 with app.app_context():
     db.create_all()
 
+# Добавляем начальные категории
+def add_initial_categories():
+    if Category.query.count() == 0:
+        categories = [
+            Category(name='Гостиная', slug='living-room', description='Мебель для гостиной'),
+            Category(name='Спальня', slug='bedroom', description='Мебель для спальни'),
+            Category(name='Кухня', slug='kitchen', description='Мебель для кухни'),
+            Category(name='Ванная', slug='bathroom', description='Мебель для ванной'),
+            Category(name='Офис', slug='office', description='Офисная мебель'),
+            Category(name='Детская', slug='children', description='Мебель для детской комнаты'),
+            Category(name='Прихожая', slug='hallway', description='Мебель для прихожей и коридора'),
+            Category(name='Балкон и терраса', slug='outdoor', description='Мебель для балкона и террасы'),
+            Category(name='Мягкая мебель', slug='soft-furniture', description='Диваны, кресла и пуфы')
+        ]
+        db.session.add_all(categories)
+        db.session.commit()
+
 # Добавляем начальные товары
 def add_initial_furniture():
     if Furniture.query.count() == 0:
-        initial_furniture = [
-            Furniture(
-                name='Диван "Комфорт"',
-                description='Просторный диван с мягкой обивкой, идеально подходит для гостиной',
-                price=25000,
-                category='living-room',
-                image='images/sofa.jpg',
-                stock=5
-            ),
-            Furniture(
-                name='Кровать "Соня"',
-                description='Двуспальная кровать с ортопедическим матрасом',
-                price=35000,
-                category='bedroom',
-                image='images/bed.jpg',
-                stock=3
-            ),
-            Furniture(
-                name='Кухонный гарнитур "Стиль"',
-                description='Современный кухонный гарнитур с встроенной техникой',
-                price=45000,
-                category='kitchen',
-                image='images/kitchen.jpg',
-                stock=2
-            )
-        ]
-        db.session.add_all(initial_furniture)
-        db.session.commit()
+        try:
+            # Получаем категории
+            categories = {cat.slug: cat.id for cat in Category.query.all()}
+            
+            if not categories:
+                print("Ошибка: категории не найдены")
+                return
+
+            initial_furniture = [
+                Furniture(
+                    name='Диван "Комфорт"',
+                    description='Просторный диван с мягкой обивкой',
+                    price=25000,
+                    category_id=categories['living-room'],
+                    image='images/living-room.jpg',
+                    stock=5
+                ),
+                Furniture(
+                    name='Кровать "Соня"',
+                    description='Двуспальная кровать с ортопедическим матрасом',
+                    price=35000,
+                    category_id=categories['bedroom'],
+                    image='images/bedroom.jpg',
+                    stock=3
+                ),
+                Furniture(
+                    name='Кухонный гарнитур "Стиль"',
+                    description='Современный кухонный гарнитур',
+                    price=45000,
+                    category_id=categories['kitchen'],
+                    image='images/kitchen.jpg',
+                    stock=2
+                ),
+                Furniture(
+                    name='Шкаф для ванной "Волна"',
+                    description='Влагостойкий шкаф для ванной комнаты',
+                    price=15000,
+                    category_id=categories['bathroom'],
+                    image='images/bathroom.jpg',
+                    stock=4
+                ),
+                Furniture(
+                    name='Письменный стол "Профи"',
+                    description='Эргономичный офисный стол',
+                    price=12000,
+                    category_id=categories['office'],
+                    image='images/office.jpg',
+                    stock=6
+                ),
+                Furniture(
+                    name='Детская кровать "Сказка"',
+                    description='Красивая и безопасная кровать для детей',
+                    price=18000,
+                    category_id=categories['children'],
+                    image='images/children.jpg',
+                    stock=3
+                ),
+                Furniture(
+                    name='Шкаф для прихожей "Визит"',
+                    description='Вместительный шкаф с зеркалом для прихожей',
+                    price=22000,
+                    category_id=categories['hallway'],
+                    image='images/hallway.jpg',
+                    stock=4
+                ),
+                Furniture(
+                    name='Комплект для балкона "Бриз"',
+                    description='Легкий и стильный комплект мебели для балкона',
+                    price=15000,
+                    category_id=categories['outdoor'],
+                    image='images/outdoor.jpg',
+                    stock=2
+                ),
+                Furniture(
+                    name='Диван-кровать "Комфорт Люкс"',
+                    description='Удобный раскладной диван с механизмом еврокнижка',
+                    price=45000,
+                    category_id=categories['soft-furniture'],
+                    image='images/soft-furniture.jpg',
+                    stock=3
+                )
+            ]
+            
+            print("Добавление начальных товаров...")
+            for item in initial_furniture:
+                print(f"Добавление {item.name} для категории {item.category_id}")
+                db.session.add(item)
+            
+            db.session.commit()
+            print("Начальные товары успешно добавлены")
+        except Exception as e:
+            print(f"Ошибка при добавлении начальных товаров: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            db.session.rollback()
 
 # Создаем администратора
 def create_admin():
-    try:
-        admin = User.query.filter_by(username='admin').first()
-        if not admin:
-            admin = User(
-                username='admin',
-                email='admin@example.com',
-                is_admin=True
-            )
-            admin.set_password('admin123')
-            db.session.add(admin)
-            db.session.commit()
-            print('Администратор создан: admin/admin123')
-    except Exception as e:
-        print(f'Ошибка при создании администратора: {str(e)}')
-        db.session.rollback()
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        admin = User(
+            username='admin',
+            email='admin@example.com',
+            is_admin=True
+        )
+        admin.set_password('admin123')
+        db.session.add(admin)
+        db.session.commit()
+        print('Администратор создан: admin/admin123')
 
 # Декоратор для проверки прав администратора
 def admin_required(f):
@@ -151,8 +253,9 @@ def home():
 
 @app.route('/category/<category>')
 def category(category):
-    furniture = Furniture.query.filter_by(category=category).all()
-    return render_template('category.html', furniture=furniture, category=category)
+    category_obj = Category.query.filter_by(slug=category).first_or_404()
+    furniture = Furniture.query.filter_by(category_id=category_obj.id).all()
+    return render_template('category.html', furniture=furniture, category=category_obj)
 
 @app.route('/add_to_cart/<int:furniture_id>', methods=['POST'])
 def add_to_cart(furniture_id):
@@ -207,6 +310,37 @@ def remove_from_cart(item_id):
     flash('Товар удален из корзины', 'success')
     return redirect(url_for('cart'))
 
+def send_order_notification(order):
+    """Отправка уведомления админу о новом заказе"""
+    admin = User.query.filter_by(is_admin=True).first()
+    if not admin:
+        return
+    
+    items_list = "\n".join([
+        f"- {item.furniture.name} (количество: {item.quantity}, цена: {item.price} ₽)"
+        for item in order.items
+    ])
+    
+    customer = User.query.get(order.user_id)
+    
+    subject = f"Новый заказ #{order.id}"
+    body = f"""
+    Поступил новый заказ!
+    
+    Номер заказа: {order.id}
+    Покупатель: {customer.username}
+    Email покупателя: {customer.email}
+    Сумма заказа: {order.total_amount} ₽
+    
+    Товары в заказе:
+    {items_list}
+    
+    Для просмотра деталей заказа перейдите по ссылке:
+    {url_for('admin_order_detail', id=order.id, _external=True)}
+    """
+    
+    send_notification(subject, admin.email, body)
+
 @app.route('/checkout', methods=['GET', 'POST'])
 def checkout():
     if 'user_id' not in session:
@@ -241,6 +375,10 @@ def checkout():
             CartItem.query.filter_by(id=item.id).delete()
         
         db.session.commit()
+        
+        # Отправляем уведомление админу
+        send_order_notification(order)
+        
         flash('Заказ успешно оформлен', 'success')
         return redirect(url_for('orders'))
     
@@ -277,7 +415,7 @@ def cancel_order(order_id):
 @app.route('/search')
 def search():
     query = request.args.get('query', '')
-    category = request.args.get('category', '')
+    category_slug = request.args.get('category', '')
     
     furniture_query = Furniture.query
     
@@ -289,11 +427,30 @@ def search():
             )
         )
     
-    if category:
-        furniture_query = furniture_query.filter_by(category=category)
+    if category_slug:
+        category = Category.query.filter_by(slug=category_slug).first()
+        if category:
+            furniture_query = furniture_query.filter_by(category_id=category.id)
     
     furniture = furniture_query.all()
-    return render_template('search.html', furniture=furniture, query=query, selected_category=category)
+    return render_template('search.html', furniture=furniture, query=query, selected_category=category_slug)
+
+def handle_image_upload(image_file, default_category_path):
+    """Обработка загрузки изображения"""
+    if image_file and image_file.filename:
+        filename = secure_filename(f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{image_file.filename}")
+        upload_dir = os.path.join('static', 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        file_path = os.path.join(upload_dir, filename)
+        
+        try:
+            image_file.save(file_path)
+            return f"uploads/{filename}"
+        except Exception as e:
+            print(f"Ошибка при сохранении изображения: {str(e)}")
+            flash(f'Ошибка при сохранении изображения: {str(e)}', 'danger')
+            return default_category_path
+    return default_category_path
 
 @app.route('/admin', methods=['GET', 'POST'])
 @admin_required
@@ -305,47 +462,21 @@ def admin():
         category = request.form['category']
         stock = int(request.form['stock'])
         
-        # Выбираем изображение по умолчанию в зависимости от категории
-        if category == 'living-room':
-            image_path = 'images/sofa.jpg'
-        elif category == 'bedroom':
-            image_path = 'images/bed.jpg'
-        elif category == 'kitchen':
-            image_path = 'images/kitchen.jpg'
-        else:
-            image_path = 'uploads/default.jpg'
+        # Определяем изображение по умолчанию для категории
+        default_image = {
+            'living-room': 'images/sofa.jpg',
+            'bedroom': 'images/bed.jpg',
+            'kitchen': 'images/kitchen.jpg'
+        }.get(category, 'uploads/default.jpg')
         
-        # Проверяем, загружен ли файл изображения
-        if 'image' in request.files and request.files['image'].filename:
-            image = request.files['image']
-            # Создаем уникальное имя файла
-            filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{image.filename}"
-            
-            # Обеспечиваем, что директория существует
-            upload_dir = os.path.join('static', 'uploads')
-            os.makedirs(upload_dir, exist_ok=True)
-            
-            # Полный путь для сохранения файла
-            file_save_path = os.path.join(upload_dir, filename)
-            
-            try:
-                # Сохраняем файл
-                image.save(file_save_path)
-                
-                # Путь для базы данных (относительно static/)
-                image_path = f"uploads/{filename}"
-                
-                print(f"Файл сохранен: {file_save_path}")
-                print(f"Путь в БД: {image_path}")
-            except Exception as e:
-                print(f"Ошибка при сохранении изображения: {str(e)}")
-                flash(f'Ошибка при сохранении изображения: {str(e)}', 'danger')
+        # Обрабатываем загрузку изображения
+        image_path = handle_image_upload(request.files.get('image'), default_image)
         
         furniture = Furniture(
             name=name,
             description=description,
             price=price,
-            category=category,
+            category_id=category,
             image=image_path,
             stock=stock
         )
@@ -369,8 +500,8 @@ def admin_edit_furniture(id):
         furniture.price = float(request.form['price'])
         
         # Если категория изменилась, обновляем изображение по умолчанию
-        old_category = furniture.category
-        furniture.category = request.form['category']
+        old_category = furniture.category_id
+        furniture.category_id = request.form['category']
         furniture.stock = int(request.form['stock'])
         
         # Проверяем, загружен ли файл изображения
@@ -403,12 +534,12 @@ def admin_edit_furniture(id):
                 flash(f'Ошибка при сохранении изображения: {str(e)}', 'danger')
         # Если категория изменилась, но новая картинка не загружена, 
         # меняем картинку на стандартную для новой категории
-        elif old_category != furniture.category:
-            if furniture.category == 'living-room':
+        elif old_category != furniture.category_id:
+            if furniture.category_id == 'living-room':
                 furniture.image = 'images/sofa.jpg'
-            elif furniture.category == 'bedroom':
+            elif furniture.category_id == 'bedroom':
                 furniture.image = 'images/bed.jpg'
-            elif furniture.category == 'kitchen':
+            elif furniture.category_id == 'kitchen':
                 furniture.image = 'images/kitchen.jpg'
         
         db.session.commit()
@@ -425,6 +556,108 @@ def admin_delete_furniture(id):
     db.session.commit()
     flash('Товар успешно удален!', 'success')
     return redirect(url_for('admin'))
+
+@app.route('/admin/dashboard')
+@admin_required
+def admin_dashboard():
+    return render_template('admin/dashboard.html')
+
+@app.route('/admin/products')
+@admin_required
+def admin_products():
+    products = Furniture.query.all()
+    return render_template('admin/products.html', products=products)
+
+@app.route('/admin/product/add', methods=['GET', 'POST'])
+@admin_required
+def admin_add_product():
+    if request.method == 'POST':
+        image = request.files['image']
+        if image:
+            filename = secure_filename(image.filename)
+            image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            image_path = f'images/{filename}'
+        else:
+            image_path = 'images/default.jpg'
+
+        new_product = Furniture(
+            name=request.form['name'],
+            description=request.form['description'],
+            price=float(request.form['price']),
+            category_id=request.form['category'],
+            image=image_path,
+            stock=int(request.form['stock'])
+        )
+        db.session.add(new_product)
+        db.session.commit()
+        flash('Товар успешно добавлен', 'success')
+        return redirect(url_for('admin_products'))
+    return render_template('admin/add_product.html')
+
+@app.route('/admin/product/delete/<int:id>', methods=['POST'])
+@admin_required
+def admin_delete_product(id):
+    product = Furniture.query.get_or_404(id)
+    db.session.delete(product)
+    db.session.commit()
+    flash('Товар успешно удален', 'success')
+    return redirect(url_for('admin_products'))
+
+@app.route('/admin/orders')
+@admin_required
+def admin_orders():
+    orders = Order.query.order_by(Order.created_at.desc()).all()
+    return render_template('admin/orders.html', orders=orders)
+
+@app.route('/admin/order/<int:id>')
+@admin_required
+def admin_order_detail(id):
+    order = Order.query.get_or_404(id)
+    return render_template('admin/order_detail.html', order=order)
+
+@app.route('/admin/order/status/<int:id>', methods=['POST'])
+@admin_required
+def admin_update_order_status(id):
+    order = Order.query.get_or_404(id)
+    order.status = request.form['status']
+    db.session.commit()
+    flash('Статус заказа обновлен', 'success')
+    return redirect(url_for('admin_order_detail', id=id))
+
+@app.route('/admin/product/edit/<int:id>', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_product(id):
+    furniture = Furniture.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        furniture.name = request.form['name']
+        furniture.description = request.form['description']
+        furniture.price = float(request.form['price'])
+        furniture.category_id = int(request.form['category_id'])
+        furniture.stock = int(request.form['stock'])
+        
+        # Обработка загрузки нового изображения
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and file.filename:
+                # Генерируем безопасное имя файла
+                filename = secure_filename(file.filename)
+                # Добавляем временную метку к имени файла
+                filename = f"{int(time.time())}_{filename}"
+                # Сохраняем файл
+                file.save(os.path.join(app.static_folder, 'images', filename))
+                # Обновляем путь к изображению в базе данных
+                furniture.image = f'images/{filename}'
+        
+        try:
+            db.session.commit()
+            flash('Товар успешно обновлен', 'success')
+            return redirect(url_for('admin_products'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ошибка при обновлении товара: {str(e)}', 'danger')
+    
+    return render_template('admin/edit_product.html', furniture=furniture)
 
 # Маршруты для авторизации
 @app.route('/register', methods=['GET', 'POST'])
@@ -481,9 +714,13 @@ def create_default_images():
         'images/living-room.jpg',
         'images/bedroom.jpg', 
         'images/kitchen.jpg',
-        'images/sofa.jpg',
-        'images/bed.jpg',
-        'uploads/default.jpg'
+        'images/bathroom.jpg',
+        'images/office.jpg',
+        'images/children.jpg',
+        'images/hallway.jpg',
+        'images/outdoor.jpg',
+        'images/soft-furniture.jpg',
+        'images/default-category.jpg'
     ]
     
     # Создаем простые тестовые изображения, если файлы не существуют
@@ -495,8 +732,8 @@ def create_default_images():
             
             try:
                 # Создаем простое тестовое изображение
-                # Создаем изображение 300x200 пикселей
-                img = Image.new('RGB', (300, 200), color=(73, 109, 137))
+                # Создаем изображение 800x600 пикселей
+                img = Image.new('RGB', (800, 600), color=(73, 109, 137))
                 
                 # Добавляем текст
                 d = ImageDraw.Draw(img)
@@ -524,11 +761,11 @@ def fix_image_paths():
                 print(f"Файл изображения не найден: {full_path}")
                 
                 # Устанавливаем изображение по умолчанию в зависимости от категории
-                if item.category == 'living-room':
+                if item.category_id == 'living-room':
                     new_path = 'images/sofa.jpg'
-                elif item.category == 'bedroom':
+                elif item.category_id == 'bedroom':
                     new_path = 'images/bed.jpg'
-                elif item.category == 'kitchen':
+                elif item.category_id == 'kitchen':
                     new_path = 'images/kitchen.jpg'
                 else:
                     new_path = 'uploads/default.jpg'
@@ -550,59 +787,211 @@ def initialize_on_first_request():
     global _is_initialized
     if not _is_initialized and os.environ.get('RAILWAY_ENVIRONMENT'):
         print("Инициализация приложения на Railway...")
-        create_default_images()
         with app.app_context():
             try:
+                # Создаем таблицы
                 db.create_all()
-                # Добавляем начальные данные только если таблицы пустые
+                print("Таблицы созданы")
+
+                # Создаем изображения по умолчанию
+                create_default_images()
+                print("Изображения по умолчанию созданы")
+
+                # Создаем администратора
                 if User.query.count() == 0:
                     create_admin()
+                    print("Администратор создан")
+
+                # Создаем категории
+                if Category.query.count() == 0:
+                    add_initial_categories()
+                    print("Категории созданы")
+                    # Делаем коммит, чтобы получить ID категорий
+                    db.session.commit()
+
+                # Добавляем мебель только после создания категорий
                 if Furniture.query.count() == 0:
                     add_initial_furniture()
-                fix_image_paths()
-                print("Инициализация базы данных завершена")
+                    print("Начальные товары добавлены")
+
+                print("Инициализация базы данных завершена успешно")
             except Exception as e:
                 print(f"Ошибка при инициализации базы данных: {str(e)}")
+                import traceback
+                print(traceback.format_exc())
         _is_initialized = True
 
-# Инициализация базы данных и создание администратора
-def init_db():
-    with app.app_context():
-        db.create_all()
-        create_admin()
-        add_initial_furniture()
-
-# Вызываем инициализацию при запуске
-init_db()
-
-@app.route('/admin')
+@app.route('/admin/categories')
 @admin_required
-def admin_panel():
-    products = Furniture.query.all()
-    orders = Order.query.all()
-    return render_template('admin/dashboard.html', products=products, orders=orders)
+def admin_categories():
+    categories = Category.query.all()
+    return render_template('admin/categories.html', categories=categories)
 
-@app.route('/admin/products')
+@app.route('/admin/category/add', methods=['POST'])
 @admin_required
-def admin_products():
-    products = Furniture.query.all()
-    return render_template('admin/products.html', products=products)
+def admin_add_category():
+    try:
+        name = request.form['name']
+        slug = request.form['slug']
+        description = request.form['description']
+        
+        # Проверяем уникальность slug
+        if Category.query.filter_by(slug=slug).first():
+            flash('Категория с таким URL уже существует', 'danger')
+            return redirect(url_for('admin_categories'))
+        
+        # Создаем категорию
+        category = Category(name=name, slug=slug, description=description)
+        db.session.add(category)
+        
+        # Обработка загрузки изображения
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and file.filename:
+                try:
+                    # Создаем директорию, если её нет
+                    os.makedirs(os.path.join(app.static_folder, 'images'), exist_ok=True)
+                    
+                    # Сохраняем файл с именем slug категории
+                    filename = f"{slug}.jpg"
+                    file_path = os.path.join(app.static_folder, 'images', filename)
+                    file.save(file_path)
+                    
+                    # Оптимизируем изображение
+                    with Image.open(file_path) as img:
+                        # Изменяем размер до 800x600, сохраняя пропорции
+                        img.thumbnail((800, 600))
+                        img.save(file_path, 'JPEG', quality=85)
+                    
+                except Exception as e:
+                    flash(f'Ошибка при сохранении изображения: {str(e)}', 'danger')
+                    db.session.rollback()
+                    return redirect(url_for('admin_categories'))
+        
+        db.session.commit()
+        flash('Категория успешно добавлена', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ошибка при добавлении категории: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_categories'))
 
-@app.route('/admin/orders')
+@app.route('/admin/category/edit/<int:id>', methods=['POST'])
 @admin_required
-def admin_orders():
-    orders = Order.query.all()
-    return render_template('admin/orders.html', orders=orders)
+def admin_edit_category(id):
+    category = Category.query.get_or_404(id)
+    old_slug = category.slug
+    
+    # Проверяем уникальность slug
+    new_slug = request.form['slug']
+    if new_slug != category.slug and Category.query.filter_by(slug=new_slug).first():
+        flash('Категория с таким URL уже существует', 'danger')
+        return redirect(url_for('admin_categories'))
+    
+    category.name = request.form['name']
+    category.slug = new_slug
+    category.description = request.form['description']
+    
+    # Обработка загрузки нового изображения
+    if 'image' in request.files:
+        file = request.files['image']
+        if file and file.filename:
+            try:
+                # Создаем директорию, если её нет
+                os.makedirs(os.path.join(app.static_folder, 'images'), exist_ok=True)
+                
+                # Если slug изменился, удаляем старое изображение
+                if old_slug != new_slug:
+                    old_image_path = os.path.join(app.static_folder, 'images', f"{old_slug}.jpg")
+                    if os.path.exists(old_image_path):
+                        os.remove(old_image_path)
+                
+                # Сохраняем новое изображение
+                filename = f"{new_slug}.jpg"
+                file_path = os.path.join(app.static_folder, 'images', filename)
+                file.save(file_path)
+                
+                # Оптимизируем изображение
+                with Image.open(file_path) as img:
+                    # Изменяем размер до 800x600, сохраняя пропорции
+                    img.thumbnail((800, 600))
+                    img.save(file_path, 'JPEG', quality=85)
+                
+            except Exception as e:
+                flash(f'Ошибка при сохранении изображения: {str(e)}', 'danger')
+    # Если slug изменился, но новое изображение не загружено, переименовываем старое
+    elif old_slug != new_slug:
+        old_image_path = os.path.join(app.static_folder, 'images', f"{old_slug}.jpg")
+        new_image_path = os.path.join(app.static_folder, 'images', f"{new_slug}.jpg")
+        if os.path.exists(old_image_path):
+            try:
+                os.rename(old_image_path, new_image_path)
+            except Exception as e:
+                flash(f'Ошибка при переименовании изображения: {str(e)}', 'danger')
+    
+    try:
+        db.session.commit()
+        flash('Категория успешно обновлена', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ошибка при обновлении категории: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_categories'))
+
+@app.route('/admin/category/delete/<int:id>', methods=['POST'])
+@admin_required
+def admin_delete_category(id):
+    category = Category.query.get_or_404(id)
+    
+    try:
+        # Удаляем изображение категории
+        image_path = os.path.join(app.static_folder, 'images', f"{category.slug}.jpg")
+        if os.path.exists(image_path):
+            os.remove(image_path)
+        
+        # Удаляем все товары в категории
+        Furniture.query.filter_by(category_id=category.id).delete()
+        # Удаляем саму категорию
+        db.session.delete(category)
+        db.session.commit()
+        flash('Категория и все связанные товары успешно удалены', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ошибка при удалении категории: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_categories'))
 
 if __name__ == '__main__':
     # Локальная разработка
-    create_default_images()
-    
     with app.app_context():
+        # Создаем таблицы
         db.create_all()
-        add_initial_furniture()
-        create_admin()
+        print("Таблицы созданы")
+
+        # Создаем изображения по умолчанию
+        create_default_images()
+        print("Изображения по умолчанию созданы")
+
+        # Создаем администратора
+        if User.query.count() == 0:
+            create_admin()
+            print("Администратор создан")
+
+        # Создаем категории
+        if Category.query.count() == 0:
+            add_initial_categories()
+            print("Категории созданы")
+            # Делаем коммит, чтобы получить ID категорий
+            db.session.commit()
+
+        # Добавляем мебель только после создания категорий
+        if Furniture.query.count() == 0:
+            add_initial_furniture()
+            print("Начальные товары добавлены")
+
+        # Проверяем и исправляем пути к изображениям
         fix_image_paths()
+        print("Пути к изображениям проверены и исправлены")
     
     # Определение порта для Railway или локального запуска
     port = int(os.environ.get('PORT', 5000))

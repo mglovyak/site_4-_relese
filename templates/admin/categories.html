@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Управление категориями{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Управление категориями</h1>
+        <button type="button" class="btn btn-success" data-toggle="modal" data-target="#addCategoryModal">
+            <i class="fas fa-plus"></i> Добавить категорию
+        </button>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead class="thead-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Изображение</th>
+                    <th>Название</th>
+                    <th>Путь</th>
+                    <th>Описание</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for category in categories %}
+                <tr>
+                    <td>{{ category.id }}</td>
+                    <td>
+                        <img src="{{ url_for('static', filename='images/' + category.slug + '.jpg') }}" 
+                             alt="{{ category.name }}"
+                             style="max-width: 50px;"
+                             onerror="this.src='{{ url_for('static', filename='images/default-category.jpg') }}'">
+                    </td>
+                    <td>{{ category.name }}</td>
+                    <td>{{ category.slug }}</td>
+                    <td>{{ category.description }}</td>
+                    <td>
+                        <button type="button" 
+                                class="btn btn-primary btn-sm"
+                                data-toggle="modal" 
+                                data-target="#editCategoryModal{{ category.id }}">
+                            <i class="fas fa-edit"></i> Редактировать
+                        </button>
+                        <form action="{{ url_for('admin_delete_category', id=category.id) }}" 
+                              method="POST" 
+                              style="display: inline-block;"
+                              onsubmit="return confirm('Вы уверены, что хотите удалить эту категорию? Все товары в этой категории также будут удалены!');">
+                            <button type="submit" class="btn btn-danger btn-sm">
+                                <i class="fas fa-trash"></i> Удалить
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модальное окно для добавления категории -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1" role="dialog" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addCategoryModalLabel">Добавить категорию</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="{{ url_for('admin_add_category') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="name">Название категории</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="slug">Название пути(для URL)</label>
+                        <input type="text" class="form-control" id="slug" name="slug" required>
+                        <small class="form-text text-muted">URL-имя категории (только латинские буквы, цифры и дефис)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Описание</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="image">Изображение категории</label>
+                        <input type="file" class="form-control-file" id="image" name="image" accept="image/*">
+                        <small class="form-text text-muted">Рекомендуемый размер: 800x600 пикселей</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальные окна для редактирования категорий -->
+{% for category in categories %}
+<div class="modal fade" id="editCategoryModal{{ category.id }}" tabindex="-1" role="dialog" aria-labelledby="editCategoryModalLabel{{ category.id }}" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editCategoryModalLabel{{ category.id }}">Редактировать категорию</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="{{ url_for('admin_edit_category', id=category.id) }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="name{{ category.id }}">Название категории</label>
+                        <input type="text" class="form-control" id="name{{ category.id }}" name="name" value="{{ category.name }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="slug{{ category.id }}">Slug (для URL)</label>
+                        <input type="text" class="form-control" id="slug{{ category.id }}" name="slug" value="{{ category.slug }}" required>
+                        <small class="form-text text-muted">URL-имя категории (только латинские буквы, цифры и дефис)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="description{{ category.id }}">Описание</label>
+                        <textarea class="form-control" id="description{{ category.id }}" name="description" rows="3">{{ category.description }}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="image{{ category.id }}">Изображение категории</label>
+                        <input type="file" class="form-control-file" id="image{{ category.id }}" name="image" accept="image/*">
+                        <small class="form-text text-muted">Оставьте пустым, чтобы сохранить текущее изображение</small>
+                        <div class="mt-2">
+                            <p>Текущее изображение:</p>
+                            <img src="{{ url_for('static', filename='images/' + category.slug + '.jpg') }}" 
+                                 alt="{{ category.name }}" 
+                                 style="max-width: 200px;"
+                                 onerror="this.src='{{ url_for('static', filename='images/default-category.jpg') }}'">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Функция для преобразования строки в slug
+function stringToSlug(str) {
+    str = str.toLowerCase();
+    str = str.replace(/[^a-z0-9]+/g, '-');
+    str = str.replace(/^-+|-+$/g, '');
+    return str;
+}
+
+// Обработчик для поля ввода названия категории
+document.getElementById('name').addEventListener('input', function() {
+    document.getElementById('slug').value = stringToSlug(this.value);
+});
+
+// Обработчики для полей ввода названия категории в формах редактирования
+{% for category in categories %}
+document.getElementById('name{{ category.id }}').addEventListener('input', function() {
+    document.getElementById('slug{{ category.id }}').value = stringToSlug(this.value);
+});
+{% endfor %}
+</script>
+{% endblock %} 
