@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Изменение данных администратора{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Изменение данных администратора</h4>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST" action="{{ url_for('change_admin') }}">
+                        <div class="form-group">
+                            <label for="username">Новое имя пользователя</label>
+                            <input type="text" class="form-control" id="username" name="username" value="{{ current_user.username }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="current_password">Текущий пароль</label>
+                            <input type="password" class="form-control" id="current_password" name="current_password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new_password">Новый пароль</label>
+                            <input type="password" class="form-control" id="new_password" name="new_password">
+                            <small class="form-text text-muted">Оставьте пустым, если не хотите менять пароль</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm_password">Подтвердите новый пароль</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Отмена</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer %}
+<footer class="footer mt-5 py-3 bg-dark text-light">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <h5 class="text-white">Административная панель</h5>
+                <p>Управление категориями и товарами магазина</p>
+            </div>
+            <div class="col-md-4">
+                <h5 class="text-white">Быстрые ссылки</h5>
+                <ul class="list-unstyled">
+                    <li><a href="{{ url_for('admin_dashboard') }}" class="text-light">Главная панель</a></li>
+                    <li><a href="{{ url_for('admin_products') }}" class="text-light">Управление товарами</a></li>
+                    <li><a href="{{ url_for('admin_orders') }}" class="text-light">Управление заказами</a></li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <h5 class="text-white">Контакты</h5>
+                <p>Телефон: 8-800-555-35-35<br>
+                Email: mglovyak@bk.ru<br>
+                Адрес: г. Cимферополь,Ул. Набережная им. 60-летия СССР дом 85-А</p>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12 text-center">
+                <p class="mb-0">&copy; 2025 Мебель-Экспресс. Все права защищены.</p>
+            </div>
+        </div>
+    </div>
+</footer>
+{% endblock %} 

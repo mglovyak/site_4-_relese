@@ -25,12 +25,54 @@
                 <td>{{ order.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
                 <td>{{ order.total_amount }} ₽</td>
                 <td>
-                    <span class="badge badge-{{ 'success' if order.status == 'completed' else 'warning' if order.status == 'processing' else 'secondary' }}">
-                        {{ order.status }}
-                    </span>
+                    {% set status_info = {
+                        'pending': ('Ожидает', 'warning'),
+                        'processing': ('В обработке', 'info'),
+                        'completed': ('Выполнен', 'success'),
+                        'cancelled': ('Отменён', 'danger')
+                    } %}
+                    {% set status_text, status_class = status_info.get(order.status, ('Неизвестно', 'secondary')) %}
+                    <span class="badge bg-{{ status_class }} text-white">{{ status_text }}</span>
                 </td>
                 <td>
-                    <a href="{{ url_for('admin_order_detail', id=order.id) }}" class="btn btn-sm btn-info">Подробнее</a>
+                    <div class="btn-group">
+                        <a href="{{ url_for('admin_order_detail', id=order.id) }}" 
+                           class="btn btn-sm btn-info">
+                            <i class="fas fa-eye"></i> Подробнее
+                        </a>
+                        <button type="button" 
+                                class="btn btn-sm btn-primary dropdown-toggle" 
+                                data-bs-toggle="dropdown" 
+                                aria-expanded="false">
+                            <i class="fas fa-cog"></i> Статус
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <form action="{{ url_for('admin_update_order_status', id=order.id) }}" method="POST">
+                                    <input type="hidden" name="status" value="processing">
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="fas fa-clock text-info"></i> В обработке
+                                    </button>
+                                </form>
+                            </li>
+                            <li>
+                                <form action="{{ url_for('admin_update_order_status', id=order.id) }}" method="POST">
+                                    <input type="hidden" name="status" value="completed">
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="fas fa-check text-success"></i> Выполнен
+                                    </button>
+                                </form>
+                            </li>
+                            <li>
+                                <form action="{{ url_for('admin_update_order_status', id=order.id) }}" method="POST">
+                                    <input type="hidden" name="status" value="cancelled">
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="fas fa-times text-danger"></i> Отменён
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
                 </td>
             </tr>
             {% endfor %}

@@ -61,4 +61,36 @@
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block footer %}
+<footer class="footer mt-5 py-3 bg-dark text-light">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <h5 class="text-white">Административная панель</h5>
+                <p>Управление категориями и товарами магазина</p>
+            </div>
+            <div class="col-md-4">
+                <h5 class="text-white">Быстрые ссылки</h5>
+                <ul class="list-unstyled">
+                    <li><a href="{{ url_for('admin_dashboard') }}" class="text-light">Главная панель</a></li>
+                    <li><a href="{{ url_for('admin_products') }}" class="text-light">Управление товарами</a></li>
+                    <li><a href="{{ url_for('admin_orders') }}" class="text-light">Управление заказами</a></li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <h5 class="text-white">Контакты</h5>
+                <p>Телефон: 8-800-555-35-35<br>
+                Email: mglovyak@bk.ru<br>
+                Адрес: г. Cимферополь,Ул. Набережная им. 60-летия СССР дом 85-А</p>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12 text-center">
+                <p class="mb-0">&copy; 2025 Мебель-Экспресс. Все права защищены.</p>
+            </div>
+        </div>
+    </div>
+</footer>
 {% endblock %} 
