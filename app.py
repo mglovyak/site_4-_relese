@@ -24,9 +24,9 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'your-email@gmail.com')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'your-app-password')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME', 'your-email@gmail.com')
 db = SQLAlchemy(app)
 
 mail = init_mail(app)
@@ -39,9 +39,18 @@ def cart_count(user_id):
 def utility_processor():
     def get_categories():
         return Category.query.order_by(Category.name).all()
+    
+    def cart_count(user_id):
+        return CartItem.query.filter_by(user_id=user_id).count()
+    
     def get_user(user_id):
         return User.query.get(user_id)
-    return dict(get_categories=get_categories, get_user=get_user)
+    
+    return dict(
+        get_categories=get_categories,
+        cart_count=cart_count,
+        get_user=get_user
+    )
 
 # Модели
 class User(db.Model):
@@ -960,6 +969,48 @@ def admin_delete_category(id):
         flash(f'Ошибка при удалении категории: {str(e)}', 'danger')
     
     return redirect(url_for('admin_categories'))
+
+@app.route('/admin/change-admin', methods=['GET', 'POST'])
+@admin_required
+def change_admin():
+    if request.method == 'POST':
+        try:
+            current_user = User.query.get(session['user_id'])
+            current_password = request.form['current_password']
+            new_username = request.form['username']
+            new_password = request.form['new_password']
+            confirm_password = request.form['confirm_password']
+
+            # Проверяем текущий пароль
+            if not current_user.check_password(current_password):
+                flash('Неверный текущий пароль', 'danger')
+                return redirect(url_for('change_admin'))
+
+            # Проверяем уникальность нового имени пользователя
+            if new_username != current_user.username:
+                existing_user = User.query.filter_by(username=new_username).first()
+                if existing_user:
+                    flash('Пользователь с таким именем уже существует', 'danger')
+                    return redirect(url_for('change_admin'))
+                current_user.username = new_username
+
+            # Если введен новый пароль, проверяем его и обновляем
+            if new_password:
+                if new_password != confirm_password:
+                    flash('Новые пароли не совпадают', 'danger')
+                    return redirect(url_for('change_admin'))
+                current_user.set_password(new_password)
+
+            db.session.commit()
+            flash('Данные успешно обновлены', 'success')
+            return redirect(url_for('admin_dashboard'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ошибка при обновлении данных: {str(e)}', 'danger')
+            return redirect(url_for('change_admin'))
+
+    return render_template('admin/change_admin.html', current_user=User.query.get(session['user_id']))
 
 if __name__ == '__main__':
     # Локальная разработка
